@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ransomware on Browser</title>
+</head>
+<body>
+    <div class="container">
+        <main>
+            <!-- Section 1: Browser & Permission Status -->
+            <section class="panel">
+                <h2>Browser Support Check</h2>
+                <div id="supportStatus" class="status-box">
+                    <p>Checking browser support...</p>
+                </div>
+            </section>
+
+            <!-- Section 2: Directory Selection -->
+            <section class="panel">
+                <h2>Select Directory to Encrypt</h2>
+                <div class="button-group">
+                    <button id="selectDirBtn" class="btn btn-primary">
+                        📁 Choose Directory
+                    </button>
+                </div>
+                <div id="selectedDirInfo" class="info-box"></div>
+            </section>
+
+            <!-- Section 3: Encryption Settings -->
+            <section class="panel">
+                <h2>Encryption Settings</h2>
+                <div class="form-group">
+                    <label>Encryption Password:</label>
+                    <input type="password" id="encryptPassword" 
+                           placeholder="Enter password">
+                </div>
+                <div class="form-group">
+                    <label>Encryption Algorithm:</label>
+                    <select id="encryptAlgorithm">
+                        <option value="AES">AES-256-CBC</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>File Extension for Encrypted Files:</label>
+                    <input type="text" id="encryptExtension" 
+                           value=".enc" 
+                           placeholder=".enc">
+                </div>
+            </section>
+
+            <!-- Section 4: Encryption Control -->
+            <section class="panel">
+                <h2>Encryption Control</h2>
+                <div class="button-group">
+                    <button id="startEncryptBtn" class="btn btn-danger" disabled>
+                        🔐 START ENCRYPTION
+                    </button>
+                    <button id="stopEncryptBtn" class="btn btn-secondary" disabled>
+                        ⏹️ STOP
+                    </button>
+                    <button id="decryptBtn" class="btn btn-info">
+                        🔓 DECRYPT (Select Encrypted File)
+                    </button>
+                </div>
+            </section>
+
+            <!-- Section 5: Progress Monitor -->
+            <section class="panel">
+                <h2>Progress Monitor</h2>
+                <div class="progress-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                <div id="progressText" class="progress-text">Ready...</div>
+                <div id="filesList" class="files-list"></div>
+            </section>
+
+            <!-- Section 6: Logs & Statistics -->
+            <section class="panel">
+                <h2>Operation Logs</h2>
+                <div class="button-group">
+                    <button id="clearLogsBtn" class="btn btn-secondary">Clear Logs</button>
+                </div>
+                <div id="logContainer" class="log-container"></div>
+            </section>
+
+        
+        </main>
+    </div>
+</body>
+</html>

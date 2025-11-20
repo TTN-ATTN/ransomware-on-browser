@@ -1,0 +1,20 @@
+version: "2.0"
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - ALLOWED_ORIGINS=http://localhost:8080
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: http://backend:4000/api
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
