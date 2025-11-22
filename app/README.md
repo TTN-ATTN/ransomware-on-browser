@@ -14,17 +14,16 @@
 - User truy cập vào web thì frontend gửi req về backend lấy clientid (random)
 - Frontend sử dụng generate key, mã hóa file = AES-256-GCM.
 - Frontend sau đó gửi key lại về backend, backend lưu clientid + key + 1 vài thông tin nhí nhố vô db (sqlite3)
-
-# Chưa làm (thứ tự ưu tiên)
 - Backend ban đầu cần vừa gen clientid, gen rsa keypair, gửi đến frontend là clientid + public key
 - Frontend gửi key AES về backend thì phải encrypt lại bằng public key trên
 - Backend phải dùng private key để decrypt ra AES key.
+- Giao diện basic (debug)
+- Ransom note and decryption request
+
+# Chưa làm (thứ tự ưu tiên)
 - Build docker, setup HTTPS và test ở ngoài xem có chạy được không (Những thứ trên đây đều chỉ test ở localhost)
 - Dự kiến up lên cloud nếu oke ._.
-
-Nếu làm được những cái trên và test OK hết rồi thì tính tới những cái sau đây.
-- Giao diện đẹp có thể đi lừa đảo
-- Ransom page để redirect sau khi mã hóa tất cả các file
+- HTTPS
 - Dashboard ở phía backend để xem thông tin clientid blabla... Nói chung là từ cái sqlites3 hiển thi lên dashboard cho đẹp
 
 # Tech
