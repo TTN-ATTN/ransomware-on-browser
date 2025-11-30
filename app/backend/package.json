@@ -5,8 +5,8 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "dev": "NODE_ENV=development node --watch server.js",
-    "start": "NODE_ENV=production node server.js"
+    "dev": "NODE_ENV=development node --watch --security-revert=CVE-2023-46809 server.js",
+    "start": "NODE_ENV=production node --security-revert=CVE-2023-46809 server.js"
   },
   "dependencies": {
     "connect-sqlite3": "^0.9.16",
