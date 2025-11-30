@@ -5,7 +5,10 @@ const webpack = require('webpack');
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000/api';
 
 module.exports = {
-  entry: path.resolve(__dirname, 'src/main.js'),
+  entry: {
+    main: path.resolve(__dirname, 'src/main.js'),
+    next: path.resolve(__dirname, 'src/next.js')
+  },
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name].[contenthash].js',
@@ -46,6 +49,14 @@ module.exports = {
   plugins: [
     new HtmlWebpackPlugin({
       template: path.resolve(__dirname, './src/templates/index.html'),
+      filename: 'index.html',
+      chunks: ['main'],
+      inject: 'body'
+    }),
+    new HtmlWebpackPlugin({
+      template: path.resolve(__dirname, './src/templates/next.html'),
+      filename: 'next.html',
+      chunks: ['next'],
       inject: 'body'
     }),
     new webpack.ProvidePlugin({
@@ -62,9 +73,14 @@ module.exports = {
     },
     port: 8080,
     hot: true,
-    historyApiFallback: true,
+    historyApiFallback: {
+      rewrites: [
+        { from: /^\/next$/, to: '/next.html' },
+        { from: /./, to: '/index.html' }
+      ]
+    },
     allowedHosts: 'all'
   },
-  devtool: 'source-map',
+  devtool: process.env.NODE_ENV === 'production' ? false : 'source-map',
   mode: process.env.NODE_ENV === 'production' ? 'production' : 'development'
 };

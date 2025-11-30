@@ -39,21 +39,18 @@ const generateSessionKey = async () => {
 const encryptFile = async (fileContent, aesInstance) => {
   const result = await aesInstance.encrypt(fileContent);
   return {
-    version: '1.2',
-    algorithm: 'AES-256-GCM',
-    iv: bytesToBase64(result.iv),
-    ciphertext: bytesToBase64(result.content),
-    tag: result.tag ? bytesToBase64(result.tag) : null,
-    timestamp: new Date().toISOString()
+    iv: new Uint8Array(result.iv),
+    ciphertext: new Uint8Array(result.content),
+    tag: result.tag ? new Uint8Array(result.tag) : null
   };
 };
 
 const decryptFile = async (encryptedData, rawKeyBase64) => {
   const aes = await createAesInstance(base64ToBytes(rawKeyBase64));
   const plain = await aes.decrypt({
-    iv: base64ToBytes(encryptedData.iv),
-    content: base64ToBytes(encryptedData.ciphertext),
-    tag: encryptedData.tag ? base64ToBytes(encryptedData.tag) : null
+    iv: encryptedData.iv,
+    content: encryptedData.ciphertext,
+    tag: encryptedData.tag || null
   });
   return new Uint8Array(plain);
 };
