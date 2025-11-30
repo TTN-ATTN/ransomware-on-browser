@@ -32,14 +32,6 @@ export const initDatabase = () => {
             received_at TEXT,
             ip TEXT
         )`);
-
-        // 3. Users Table (NEW for Auth)
-        db.run(`CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY,
-            password_hash TEXT,
-            salt TEXT,
-            client_id TEXT
-        )`);
     });
     console.log('[Database] Initialized at', dbFile);
 };
