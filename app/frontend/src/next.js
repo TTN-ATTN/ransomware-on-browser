@@ -89,11 +89,15 @@ async function decryptAllFiles(directoryHandle, rawKeyBase64) {
                 continue;
             }
 
-            // [QUAN TRỌNG] Bọc các lát cắt (slice) bằng Buffer.from()
-            const iv = Buffer.from(fileData.slice(0, 12));
-            const tag = Buffer.from(fileData.slice(12, 28)); // Tag nằm ở byte 12 đến 28
-            const ciphertext = Buffer.from(fileData.slice(28));
+            // debug
+            console.log(`[Decrypt] Reading ${fileHandle.name}, Total Size: ${fileData.length}`);
 
+            const iv = Buffer.from(fileData.slice(0, 16));        // 0 to 16
+            const tag = Buffer.from(fileData.slice(16, 32));      // 16 to 32 (16+16)
+            const ciphertext = Buffer.from(fileData.slice(32));   // 32 onwards
+
+            console.log(`[Decrypt] IV: ${iv.length}, Tag: ${tag.length}, Content: ${ciphertext.length}`);
+            
             const decryptedBytes = await CryptoModule.decryptFile(
                 { iv, ciphertext, tag }, 
                 rawKeyBase64

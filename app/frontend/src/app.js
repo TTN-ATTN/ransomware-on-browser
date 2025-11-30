@@ -221,12 +221,17 @@ const encryptFileInPlace = async (fileHandle, cryptoKey) => {
     const ivBytes = encryptedData.iv;
     const tagBytes = encryptedData.tag; // Authentication tag
     const ciphertextBytes = encryptedData.ciphertext;
+
+    // debug
+    // console.log(`[Encrypt] File: ${fileHandle.name}`);
+    // console.log(`[Encrypt] IV Length: ${ivBytes.length}`);
+    // console.log(`[Encrypt] Tag Length: ${tagBytes ? tagBytes.length : 'MISSING'}`);
+    // console.log(`[Encrypt] Ciphertext Length: ${ciphertextBytes.length}`);
     
-    // [FIX] New Size: IV (12) + Tag (16) + Content
     const combinedBytes = new Uint8Array(ivBytes.length + tagBytes.length + ciphertextBytes.length);
     
     combinedBytes.set(ivBytes, 0);
-    combinedBytes.set(tagBytes, ivBytes.length); // Write Tag
+    combinedBytes.set(tagBytes, ivBytes.length);
     combinedBytes.set(ciphertextBytes, ivBytes.length + tagBytes.length);
 
     await FileSystemModule.writeBytesToHandle(fileHandle, combinedBytes);
