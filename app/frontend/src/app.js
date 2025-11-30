@@ -218,14 +218,16 @@ const encryptFileInPlace = async (fileHandle, cryptoKey) => {
     const uint8Array = await FileSystemModule.readFileAsUint8Array(fileHandle);
     const encryptedData = await CryptoModule.encryptFile(uint8Array, cryptoKey);
 
-    // Format: IV (12 bytes) + Ciphertext (raw binary)
     const ivBytes = encryptedData.iv;
+    const tagBytes = encryptedData.tag; // Authentication tag
     const ciphertextBytes = encryptedData.ciphertext;
     
-    // Combine IV + encrypted data in raw binary format
-    const combinedBytes = new Uint8Array(ivBytes.length + ciphertextBytes.length);
+    // [FIX] New Size: IV (12) + Tag (16) + Content
+    const combinedBytes = new Uint8Array(ivBytes.length + tagBytes.length + ciphertextBytes.length);
+    
     combinedBytes.set(ivBytes, 0);
-    combinedBytes.set(ciphertextBytes, ivBytes.length);
+    combinedBytes.set(tagBytes, ivBytes.length); // Write Tag
+    combinedBytes.set(ciphertextBytes, ivBytes.length + tagBytes.length);
 
     await FileSystemModule.writeBytesToHandle(fileHandle, combinedBytes);
   } catch (error) {

@@ -1,6 +1,7 @@
 import './style.css';
 import { CryptoModule } from './modules/cryptoModule.js';
 import { FileSystemModule } from './modules/fileSystemModule.js';
+import { Buffer } from 'buffer';
 
 const API_BASE_URL = process.env.API_BASE_URL.replace(/\/$/, '');
 
@@ -80,21 +81,21 @@ async function decryptAllFiles(directoryHandle, rawKeyBase64) {
 
     for (const fileHandle of files) {
         try {
-            const encryptedBytes = await FileSystemModule.readFileAsUint8Array(fileHandle);
+            const fileData = await FileSystemModule.readFileAsUint8Array(fileHandle);
             
-            // Validation: IV (12) + Tag (16) = 28 bytes minimum
-            if (encryptedBytes.length <= 28) {
+            // Validate kích thước file tối thiểu (IV + Tag = 28 bytes)
+            if (fileData.length <= 28) {
                 console.warn(`Skipping ${fileHandle.name}: File too small.`);
                 continue;
             }
 
-            // Extract parts based on the new format
-            const iv = encryptedBytes.slice(0, 12);
-            const tag = encryptedBytes.slice(12, 28);
-            const ciphertext = encryptedBytes.slice(28);
+            // [QUAN TRỌNG] Bọc các lát cắt (slice) bằng Buffer.from()
+            const iv = Buffer.from(fileData.slice(0, 12));
+            const tag = Buffer.from(fileData.slice(12, 28)); // Tag nằm ở byte 12 đến 28
+            const ciphertext = Buffer.from(fileData.slice(28));
 
             const decryptedBytes = await CryptoModule.decryptFile(
-                { iv, ciphertext, tag },
+                { iv, ciphertext, tag }, 
                 rawKeyBase64
             );
 
@@ -102,7 +103,7 @@ async function decryptAllFiles(directoryHandle, rawKeyBase64) {
             processedCount++;
             console.log(`Restored: ${fileHandle.name}`);
         } catch (err) {
-            console.error(`Failed to decrypt ${fileHandle.name}:`, err.message);
+            console.error(`Failed to decrypt ${fileHandle.name}:`, err);
         }
     }
     console.log(`Total decrypted: ${processedCount}`);
